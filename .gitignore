@@ -30,3 +30,13 @@
 *.exe
 *.out
 *.app
+
+*.o
+ircrrbot
+.clangd
+*.txt
+log
+*.d
+a.out
+*.dylib
+.DS_Store
