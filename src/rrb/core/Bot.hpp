@@ -8,7 +8,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
-
+#include <sys/time.h>
 #define HOSTNAME "irc.gdf.org"
 
 namespace rrb
@@ -42,7 +42,6 @@ public:
         mServerAddress.sin_family = AF_INET;
         mServerAddress.sin_port = htons(mServerPort);
         inet_pton(AF_INET, mServerIP.c_str(), &mServerAddress.sin_addr);
-        
         if (connect(mSocket,(struct sockaddr *)&mServerAddress, sizeof(mServerAddress)) < 0)
         {
             close(mSocket);
@@ -53,6 +52,17 @@ public:
             close(mSocket);
             return false;
         }
+        if (mKernelQueue.Init() == FAILURE)
+        {
+            close(mSocket);
+            return false;
+        }
+        if (mKernelQueue.AddReadEvent(mSocket) == FAILURE)
+        {
+            close(mSocket);
+            return false;
+        }
+        mbConnected = true;
         return true;
     };
     void Disconnect()
@@ -65,16 +75,48 @@ public:
         message += "PASS " + mServerPassword + "\r\n"
                 + "NICK roulette\r\n"
                 + "USER RussianRoulette RussianRoulette irc.gdf.org :RussianRoulette\r\n";
-        sendBlock(message);
+        Say(message);
     }
-    void Join();
-    void Say(const std::string& IN message);
-    int32 GetSocket() const
+
+    bool Register()
     {
-        return mSocket;
+        gdf::KernelEvent event;
+        char c_buf[1024];
+        std::memset(c_buf, 0, sizeof(c_buf));
+        std::string buf;
+        struct timeval start, now;
+        gettimeofday(&start, NULL);
+        while (true)
+        {
+            gettimeofday(&now, NULL);
+            if (now.tv_sec - start.tv_sec > 5)
+                return false;
+            while (mKernelQueue.Poll(event))
+            {
+                if (event.IdentifySocket(mSocket) && event.IsReadType())
+                {
+                    std::memset(c_buf, 0, sizeof(c_buf));
+                    recv(mSocket, c_buf, 1024, 0);
+                    buf += c_buf;
+                    if (buf.find("PING") != std::string::npos
+                        && buf.find(mServerIP) != std::string::npos
+                        && buf.find("\r\n") != std::string::npos)
+                    {
+                        Say("PONG " + mServerIP + " :" + mServerIP + "\r\n");
+                        return true;
+                    }
+                }
+            }
+        }
     }
-private:
-    void sendBlock(const std::string& IN buf)
+
+    void Join()
+    {
+        std::string message;
+        message += "JOIN #" + mChannelName + "\r\n";
+        Say(message);
+    }
+    void Say(const std::string& IN buf)
     {
         const char* c_buf = buf.c_str();
         std::size_t index = 0;
@@ -88,6 +130,12 @@ private:
                 index += sendLen;
         }
     }
+    int32 GetSocket() const
+    {
+        return mSocket;
+    }
+private:
+
     const std::string mServerIP;
     const int16 mServerPort;
     const std::string mServerPassword;
@@ -96,6 +144,8 @@ private:
     
     int32 mSocket;
     struct sockaddr_in mServerAddress;
+
+    gdf::KernelQueue mKernelQueue;
 
 
 };

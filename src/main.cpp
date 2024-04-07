@@ -7,19 +7,17 @@
 
 int main()
 {
+    srand(time(0));
     rrb::Bot a("127.0.0.1",
                6667,
                "hello",
                "random");
     if (a.Connect() == false)
-    {
-        std::cout << "false" << std::endl;
-    }
-    else
-    {
-        std::cout << "true" << std::endl;
-    }
+        return 0;
     a.Authenticate();
+    if (a.Register() == false)
+        return 0;
+    a.Join();
     gdf::KernelQueue kernelQueue;
     kernelQueue.Init();
     kernelQueue.AddReadEvent(a.GetSocket());
@@ -33,8 +31,48 @@ int main()
             memset(buf, 0, buffer_size);
             recv(a.GetSocket(), buf, buffer_size, 0);
             std::string str = buf;
-            if (str[0] == 'P')
-                send(a.GetSocket(), "PONG 10.32.2.7 10.32.2.7", 25, 0);
+            if (
+                str.find("!roullete play") != std::string::npos
+            )
+            {
+                if (rand() % 6)
+                {
+                    a.Say("PRIVMSG #random :you survived\r\n");
+                    //a.Say("KICK #random wasavi :reason\r\n");
+                }
+                else
+                {
+                    
+                    a.Say("PRIVMSG #random :you died\r\n");
+                    a.Say("PRIVMSG #random :          ^         \r\n");
+                    a.Say("PRIVMSG #random :         | |        \r\n");
+                    a.Say("PRIVMSG #random :       @#####@      \r\n");
+                    a.Say("PRIVMSG #random :     (###   ###)-.  \r\n");
+                    a.Say("PRIVMSG #random :   .(###     ###) \\ \r\n");
+                    a.Say("PRIVMSG #random :  /  (###   ###)   )\r\n");
+                    a.Say("PRIVMSG #random : (=-  .@#####@|_--\"    잘 가라.\r\n");
+                    a.Say("PRIVMSG #random : /\\    \\_|l|_/ (\\\r\n");
+                    a.Say("PRIVMSG #random :(=-\\     |l|    /   \r\n");
+                    a.Say("PRIVMSG #random : \\  \\.___|l|___/    \r\n");
+                    a.Say("PRIVMSG #random : /\\      |_|   /    \r\n");
+                    a.Say("PRIVMSG #random :(=-\\._________/\\    \r\n");
+                    a.Say("PRIVMSG #random : \\             /    \r\n");
+                    a.Say("PRIVMSG #random :   \\._________/     \r\n");
+                    a.Say("PRIVMSG #random :     #  ----  #     \r\n");
+                    a.Say("PRIVMSG #random :     #   __   #       \r\n");
+                    a.Say("PRIVMSG #random :     \\########/      \r\n");
+                    a.Say("PRIVMSG #random :\r\n");
+                    a.Say("PRIVMSG #random :         V\r\n");
+                    a.Say("PRIVMSG #random :             V\r\n");
+                    a.Say("PRIVMSG #random :           V\r\n");
+                }
+                
+            }
+            else
+            {
+                std::cout << buf << std::endl;
+            }
+            
         }
     }
     pause();
