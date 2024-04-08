@@ -19,6 +19,9 @@ bool Bot::CreateInstance(const std::string &serverIP,
                          const std::string &serverPassword,
                          const std::string &channelName)
 {
+    if (sStaticInstance)
+        return false;
+
     sStaticInstance = new (std::nothrow) Bot(serverIP,
                                        serverPort,
                                        serverPassword,
@@ -36,14 +39,15 @@ void Bot::DeleteInstace()
 }
 
 Bot::Bot(const std::string& IN serverIP,
-    const int16 IN serverPort,
-    const std::string& IN serverPassword,
-    const std::string& IN channelName)
+         const int16 IN serverPort,
+         const std::string& IN serverPassword,
+         const std::string& IN channelName)
 : mServerIP(serverIP)
 , mServerPort(serverPort)
 , mServerPassword(serverPassword)
 , mChannelName(channelName)
 , mbConnected(false)
+, mMTRandom(std::time(0))
 {
 }
 
@@ -52,11 +56,11 @@ Bot::~Bot()
     Disconnect();
 }
 
-bool Bot::Connect()
+void Bot::Connect()
 {
     mSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (mSocket < 0)
-        return false;
+        std::exit(1);
     std::memset(&mServerAddress, 0, sizeof(mServerAddress));
     mServerAddress.sin_family = AF_INET;
     mServerAddress.sin_port = htons(mServerPort);
@@ -64,26 +68,25 @@ bool Bot::Connect()
     if (connect(mSocket,(struct sockaddr *)&mServerAddress, sizeof(mServerAddress)) < 0)
     {
         close(mSocket);
-        return false;
+        std::exit(1);
     }
     if (fcntl(mSocket, F_SETFL, O_NONBLOCK) < 0)
     {
         close(mSocket);
-        return false;
+        std::exit(1);
     }
     if (mKernelQueue.Init() == FAILURE)
     {
         close(mSocket);
-        return false;
+        std::exit(1);
     }
     if (mKernelQueue.AddReadEvent(mSocket) == FAILURE)
     {
         close(mSocket);
-        return false;
+        std::exit(1);
     }
     mbConnected = true;
     signal(SIGINT, Bot::signalHandler);
-    return true;
 };
 void Bot::Disconnect()
 {
@@ -98,38 +101,48 @@ void Bot::Authenticate()
     Say(message);
 }
 
-bool Bot::Register()
+void Bot::Register()
 {
     gdf::KernelEvent event;
     char c_buf[1024];
     std::memset(c_buf, 0, sizeof(c_buf));
-    std::string buf;
     struct timeval start, now;
     gettimeofday(&start, NULL);
     while (true)
     {
         gettimeofday(&now, NULL);
         if (now.tv_sec - start.tv_sec > 5)
-            return false;
+            exit(1);
         while (mKernelQueue.Poll(event))
         {
             if (event.IdentifySocket(mSocket) && event.IsReadType())
             {
                 std::memset(c_buf, 0, sizeof(c_buf));
-                recv(mSocket, c_buf, 1024, 0);
-                buf += c_buf;
-                if (buf[0] == 'P'
-                    && buf.find("PING") != std::string::npos
-                    && buf.find(mServerIP) != std::string::npos
-                    && buf.find("\r\n") != std::string::npos)
-                {
-                    Say("PONG " + mServerIP + " :" + mServerIP + "\r\n");
-                    return true;
-                }
-                else if (buf.find("433 roulette :roulette") != std::string::npos)
-                {
-                    Say("QUIT :leaving\r\n");
+                if (recv(mSocket, c_buf, 1024, 0) == -1)
                     exit(1);
+                mRecvBuffer += c_buf;
+                if (mRecvBuffer.find("\r\n") != std::string::npos)
+                {
+                    std::string message = mRecvBuffer.substr(0, mRecvBuffer.find("\r\n"));
+                    mRecvBuffer.erase(0, mRecvBuffer.find("\r\n") + 2);
+                    std::vector<std::string> messageVector = split(message, " ");
+                    if (messageVector.size() > 0 &&
+                        messageVector[0] == "PING")
+                    {
+                        std::string sendMessage("PONG");
+                        for (std::size_t i = 1; i < messageVector.size(); ++i)
+                        {
+                            sendMessage.append(" " + messageVector[i]);
+                        }
+                        sendMessage.append("\r\n");
+                        Say(sendMessage);
+                        return;
+                    }
+                    else
+                    {
+                        Say("QUIT :leaving\r\n");
+                        std::exit(1);
+                    }
                 }
             }
         }
@@ -138,9 +151,7 @@ bool Bot::Register()
 
 void Bot::Join()
 {
-    std::string message;
-    message += "JOIN #" + mChannelName + "\r\n";
-    Say(message);
+    Say("JOIN #" + mChannelName + "\r\n");
 }
 
 void Bot::Run()
@@ -158,6 +169,11 @@ void Bot::Run()
                 event.IsReadType())
             {
                 ssize_t len = recv(mSocket, c_buf, bufferSize - 1, 0);
+                if (len == -1)
+                {
+                    Say("QUIT :leaving\r\n");
+                    std::exit(1);
+                }
                 c_buf[len] = '\0';
                 buf += c_buf;
                 for (std::size_t findIndex = buf.find("\r\n");
@@ -181,8 +197,12 @@ void Bot::Say(const std::string& IN buf)
     while (true)
     {
         std::size_t messageLen = std::strlen(&c_buf[index]);
-        std::size_t sendLen = send(mSocket, &c_buf[index], messageLen, 0);
-        if (sendLen == messageLen)
+        ssize_t sendLen = send(mSocket, &c_buf[index], messageLen, 0);
+        if (sendLen == -1)
+        {
+            exit(1);
+        }
+        else if (static_cast<std::size_t>(sendLen) == messageLen)
             break;
         else
             index += sendLen;
@@ -203,7 +223,7 @@ void Bot::handleMessage(const std::string& IN message)
         messageVector[3] == ":!roulette" &&
         messageVector[4] == "play")
     {
-        if (rand() % 6)
+        if (mMTRandom.GetRandom() % 6)
         {
             Say("PRIVMSG #" + mChannelName + " :You survived\r\n");
         }

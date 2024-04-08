@@ -1,8 +1,7 @@
 #pragma once
 
-#include "BSD-GDF/Event/KernelEvent.hpp"
-#include "BSD-GDF/Event/KernelQueue.hpp"
-#include "common.hpp"
+#include <BSD-GDF/Event.hpp>
+
 #include <cstring>
 #include <netdb.h>
 #include <sys/fcntl.h>
@@ -11,6 +10,9 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <sys/time.h>
+#include <ctime>
+#include "MT19937.hpp"
+
 #define HOSTNAME "irc.gdf.org"
 
 namespace rrb
@@ -25,10 +27,10 @@ public:
                                const std::string& IN serverPassword,
                                const std::string& IN channelName);
     static void DeleteInstace();
-    bool Connect();
+    void Connect();
     void Disconnect();
     void Authenticate();
-    bool Register();
+    void Register();
     void Join();
     void Run();
 
@@ -40,7 +42,7 @@ private:
         const std::string& IN serverPassword,
         const std::string& IN channelName);
     Bot(const Bot& copy); // = delete;
-    Bot& operator=(const Bot& copy);
+    Bot& operator=(const Bot& copy); // = delete;
     virtual ~Bot();
     
     void handleMessage(const std::string& IN message);
@@ -58,7 +60,9 @@ private:
     struct sockaddr_in mServerAddress;
 
     gdf::KernelQueue mKernelQueue;
+    std::string mRecvBuffer;
 
+    MT19937 mMTRandom;
 
 };
 

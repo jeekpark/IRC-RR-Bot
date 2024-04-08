@@ -16,7 +16,6 @@ bool isInt(const std::string& literal)
 
 int main(const int IN argc, const char** IN argv)
 {
-    srand(time(0));
     if (argc != 5 ||
         std::string(argv[1]).empty() ||
         isInt(argv[2]) == false ||
@@ -35,15 +34,9 @@ int main(const int IN argc, const char** IN argv)
     {
         return 1;
     }
-    if (rrb::Bot::GetInstance()->Connect() == false)
-    {
-        return 1;
-    }
+    rrb::Bot::GetInstance()->Connect();
     rrb::Bot::GetInstance()->Authenticate();
-    if (rrb::Bot::GetInstance()->Register() == false)
-    {
-        return 1;
-    }
+    rrb::Bot::GetInstance()->Register();
     rrb::Bot::GetInstance()->Join();
     rrb::Bot::GetInstance()->Run();
     rrb::Bot::DeleteInstace();
