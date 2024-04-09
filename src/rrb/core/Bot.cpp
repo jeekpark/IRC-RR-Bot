@@ -116,7 +116,7 @@ void Bot::Register()
         if (now.tv_sec - start.tv_sec > 5)
         {
             Say("QUIT :leaving\r\n");
-            exit(1);
+            std::exit(1);
         }
         gdf::KernelEvent event;
         while (mKernelQueue.Poll(event))
@@ -127,7 +127,7 @@ void Bot::Register()
                 if (recv(mSocket, c_buf, 1023, 0) == -1)
                 {
                     Say("QUIT :leaving\r\n");
-                    exit(1);
+                    std::exit(1);
                 }
                 mRecvBuffer += c_buf;
                 while (mRecvBuffer.find("\r\n") != std::string::npos)
@@ -190,7 +190,7 @@ void Bot::Join()
         if (now.tv_sec - start.tv_sec > 2)
         {
             Say("QUIT :leaving\r\n");
-            exit(1);
+            std::exit(1);
         }
         gdf::KernelEvent event;
         while (mKernelQueue.Poll(event))
@@ -202,7 +202,7 @@ void Bot::Join()
                 if (recv(mSocket, c_buf, 1023, 0) == -1)
                 {
                     Say("QUIT :leaving\r\n");
-                    exit(1);
+                    std::exit(1);
                 }
                 mRecvBuffer += c_buf;
                 while (mRecvBuffer.find("\r\n") != std::string::npos)
@@ -268,7 +268,7 @@ void Bot::Say(const std::string& IN buf)
         ssize_t sendLen = send(mSocket, &c_buf[index], messageLen, 0);
         if (sendLen == -1)
         {
-            exit(1);
+            std::exit(1);
         }
         else if (static_cast<std::size_t>(sendLen) == messageLen)
             break;
@@ -307,7 +307,7 @@ void Bot::handleMessage(const std::string& IN message)
              messageVector[3] == "roulette")
     {
         Say("QUIT :leaving\r\n");
-        exit(0);
+        std::exit(0);
     }
 }
 
