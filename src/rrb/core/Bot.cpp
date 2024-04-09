@@ -1,8 +1,4 @@
 #include "Bot.hpp"
-#include <cstdlib>
-#include <new>
-#include <sys/signal.h>
-#include <vector>
 
 namespace rrb
 {
@@ -103,7 +99,13 @@ void Bot::Authenticate()
 
 void Bot::Register()
 {
-    gdf::KernelEvent event;
+    bool isSentPONG = false;
+    bool isRecved001 = false;
+    bool isRecved002 = false;
+    bool isRecved003 = false;
+    bool isRecved004 = false;
+    bool isRecved005 = false;
+    
     char c_buf[1024];
     std::memset(c_buf, 0, sizeof(c_buf));
     struct timeval start, now;
@@ -112,36 +114,62 @@ void Bot::Register()
     {
         gettimeofday(&now, NULL);
         if (now.tv_sec - start.tv_sec > 5)
+        {
+            Say("QUIT :leaving\r\n");
             exit(1);
+        }
+        gdf::KernelEvent event;
         while (mKernelQueue.Poll(event))
         {
             if (event.IdentifySocket(mSocket) && event.IsReadType())
             {
                 std::memset(c_buf, 0, sizeof(c_buf));
-                if (recv(mSocket, c_buf, 1024, 0) == -1)
+                if (recv(mSocket, c_buf, 1023, 0) == -1)
+                {
+                    Say("QUIT :leaving\r\n");
                     exit(1);
+                }
                 mRecvBuffer += c_buf;
-                if (mRecvBuffer.find("\r\n") != std::string::npos)
+                while (mRecvBuffer.find("\r\n") != std::string::npos)
                 {
                     std::string message = mRecvBuffer.substr(0, mRecvBuffer.find("\r\n"));
                     mRecvBuffer.erase(0, mRecvBuffer.find("\r\n") + 2);
                     std::vector<std::string> messageVector = split(message, " ");
-                    if (messageVector.size() > 0 &&
-                        messageVector[0] == "PING")
+                    if (isSentPONG == false)
                     {
-                        std::string sendMessage("PONG");
-                        for (std::size_t i = 1; i < messageVector.size(); ++i)
+                        if (messageVector.size() > 0 &&
+                            messageVector[0] == "PING")
                         {
-                            sendMessage.append(" " + messageVector[i]);
+                            std::string sendMessage("PONG");
+                            for (std::size_t i = 1; i < messageVector.size(); ++i)
+                            {
+                                sendMessage.append(" " + messageVector[i]);
+                            }
+                            sendMessage.append("\r\n");
+                            Say(sendMessage);
+                            isSentPONG = true;
                         }
-                        sendMessage.append("\r\n");
-                        Say(sendMessage);
-                        return;
+                        else
+                        {
+                            Say("QUIT :leaving\r\n");
+                            std::exit(1);
+                        }
                     }
-                    else
+                    else if (isSentPONG == true &&
+                             messageVector.size() > 3)
                     {
-                        Say("QUIT :leaving\r\n");
-                        std::exit(1);
+                        if      (messageVector[1] == "001") isRecved001 = true;
+                        else if (messageVector[1] == "002") isRecved002 = true;
+                        else if (messageVector[1] == "003") isRecved003 = true;
+                        else if (messageVector[1] == "004") isRecved004 = true;
+                        else if (messageVector[1] == "005") isRecved005 = true;
+                        else ;
+                    }
+                    
+                    if (isSentPONG && isRecved001 && isRecved002 &&
+                        isRecved003 && isRecved004 && isRecved005)
+                    {
+                        return ;
                     }
                 }
             }
@@ -152,6 +180,47 @@ void Bot::Register()
 void Bot::Join()
 {
     Say("JOIN #" + mChannelName + "\r\n");
+    char c_buf[1024];
+    std::memset(c_buf, 0, sizeof(c_buf));
+    struct timeval start, now;
+    gettimeofday(&start, NULL);
+    while (true)
+    {
+        gettimeofday(&now, NULL);
+        if (now.tv_sec - start.tv_sec > 2)
+        {
+            Say("QUIT :leaving\r\n");
+            exit(1);
+        }
+        gdf::KernelEvent event;
+        while (mKernelQueue.Poll(event))
+        {
+            if (event.IdentifySocket(mSocket) &&
+                event.IsReadType())
+            {
+                std::memset(c_buf, 0, sizeof(c_buf));
+                if (recv(mSocket, c_buf, 1023, 0) == -1)
+                {
+                    Say("QUIT :leaving\r\n");
+                    exit(1);
+                }
+                mRecvBuffer += c_buf;
+                while (mRecvBuffer.find("\r\n") != std::string::npos)
+                {
+                    std::string message = mRecvBuffer.substr(0, mRecvBuffer.find("\r\n"));
+                    mRecvBuffer.erase(0, mRecvBuffer.find("\r\n") + 2);
+                    std::vector<std::string> messageVector = split(message, " ");
+                    if (messageVector.size() >= 3 &&
+                        messageVector[0] == ":roulette!RussianRoulette@RussianRoulette" &&
+                        messageVector[1] == "JOIN" &&
+                        messageVector[2] == "#" + mChannelName)
+                    {
+                        return ;
+                    }
+                }
+            }
+        }
+    }
 }
 
 void Bot::Run()
@@ -188,7 +257,6 @@ void Bot::Run()
         }
     }
 }
-
 
 void Bot::Say(const std::string& IN buf)
 {
@@ -238,6 +306,7 @@ void Bot::handleMessage(const std::string& IN message)
              messageVector[2] == "#" + mChannelName &&
              messageVector[3] == "roulette")
     {
+        Say("QUIT :leaving\r\n");
         exit(0);
     }
 }
