@@ -31,7 +31,7 @@ jobs:
           working-directory: "."
 
       - name: Add .nojekyll
-        run:
+        run: |
           mkdir -p ./docs/html
           sudo touch ./docs/html/.nojekyll
 
